@@ -24,12 +24,14 @@ class MainActivity : Activity() {
     private lateinit var nav: LinearLayout
     private var tab=0
     private var latest=""
+    private var apkUri: android.net.Uri?=null
     private val worker=Executors.newSingleThreadExecutor()
     private fun dp(n: Int) = (n*resources.displayMetrics.density).toInt()
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         store=Store(applicationContext)
         latest=savedInstanceState?.getString("latest") ?: ""
+        apkUri=savedInstanceState?.getString("apkUri")?.let { android.net.Uri.parse(it) }
         val backdrop=FrameLayout(this)
         backdrop.addView(Aurora(this),FrameLayout.LayoutParams(-1,-1))
         panel=LinearLayout(this).apply { orientation=LinearLayout.VERTICAL; layoutDirection=View.LAYOUT_DIRECTION_RTL; setPadding(dp(18),dp(12),dp(18),dp(10)); fitsSystemWindows=true }
@@ -50,7 +52,7 @@ class MainActivity : Activity() {
         setContentView(backdrop)
         show(savedInstanceState?.getInt("tab") ?: 0)
     }
-    override fun onSaveInstanceState(outState: Bundle) { outState.putInt("tab",tab); outState.putString("latest",latest); super.onSaveInstanceState(outState) }
+    override fun onSaveInstanceState(outState: Bundle) { outState.putInt("tab",tab); outState.putString("latest",latest); outState.putString("apkUri",apkUri?.toString()); super.onSaveInstanceState(outState) }
     override fun onDestroy() { worker.shutdown(); super.onDestroy() }
     private fun glass(radius: Int=22): GradientDrawable = GradientDrawable(GradientDrawable.Orientation.TL_BR,intArrayOf(0xCF223650.toInt(),0xB0122037.toInt())).apply { cornerRadius=dp(radius).toFloat(); setStroke(dp(1),0x506E97BA) }
     private fun label(value: String,size: Int=15,color: Int=ink): TextView = TextView(this).apply { text=value; textSize=size.toFloat(); setTextColor(color); setLineSpacing(dp(4).toFloat(),1f); textDirection=View.TEXT_DIRECTION_FIRST_STRONG; setPadding(0,dp(3),0,dp(3)) }
@@ -75,10 +77,10 @@ class MainActivity : Activity() {
     private fun check(title: String, into: LinearLayout): CheckBox = CheckBox(this).apply { text=title; setTextColor(muted); textSize=14f; minHeight=dp(48); into.addView(this) }
     private fun show(index: Int) {
         tab=index; body.removeAllViews(); nav.removeAllViews()
-        listOf("الرئيسية","النطاق","الفحص","السجل").forEachIndexed { i,text ->
+        listOf("الرئيسية","النطاق","موقع","APK","السجل").forEachIndexed { i,text ->
             nav.addView(TextView(this).apply { this.text=text; textSize=13f; gravity=Gravity.CENTER; minHeight=dp(52); setTextColor(if(i==tab) mint else muted); background=if(i==tab) glass(18) else null; setOnClickListener { show(i) } },LinearLayout.LayoutParams(0,-2,1f))
         }
-        when(index) { 0->home(); 1->scopePage(); 2->scanPage(); 3->historyPage() }
+        when(index) { 0->home(); 1->scopePage(); 2->scanPage(); 3->apkPage(); 4->historyPage() }
         if(ValueAnimator.areAnimatorsEnabled()) { body.alpha=0f; body.translationY=dp(14).toFloat(); body.animate().alpha(1f).translationY(0f).setDuration(280).setInterpolator(DecelerateInterpolator()).start() }
     }
     private fun heading(title: String, subtitle: String) { body.addView(label(title,30)); body.addView(label(subtitle,14,muted).apply { setPadding(0,0,0,dp(20)) }) }
@@ -86,11 +88,12 @@ class MainActivity : Activity() {
         heading("مساحة البحث الخاصة بك", "تحليل منظم. أدلة واضحة. تحكم كامل.")
         val hero=card("جاهز لخطوتك القادمة", "KOTLIN + C++  ·  يعمل دون Root")
         hero.addView(label("ابدأ بتوثيق التصريح والنطاق، ثم وافق على خطة محدودة لكل تقييم.",16))
-        button("إعداد نطاق البرنامج  ←",hero) { show(1) }
+        button("اختيار APK وتحليله  ←",hero) { show(3) }
+        button("فحص رابط موقع",hero,false) { show(2) }
         val stats=card("${store.jobs().length()} تقييم محفوظ", if(busy.get()) "تقييم قيد التنفيذ" else "المحرك جاهز")
-        stats.addView(label("HTTP HEAD  /  TLS  /  TCP  /  SQL",14,mint))
+        stats.addView(label("APK  /  DEX  /  HTTP  /  TLS  /  TCP",14,mint))
         val tools=card("الأدوات المتاحة فعلًا")
-        tools.addView(label("• رؤوس HTTP مع التحقق من TLS\n• اتصال TCP أصلي عبر C++ لمنفذ واحد\n• مراجعة SQL محلية استدلالية\n• تقارير Markdown ومشاركة يدوية",15,muted))
+        tools.addView(label("• تحليل APK وManifest ومراجع DEX محليًا\n• رؤوس HTTP مع التحقق من TLS\n• اتصال TCP أصلي عبر C++ لمنفذ واحد\n• مراجعة SQL محلية استدلالية\n• تقارير Markdown ومشاركة يدوية",15,muted))
         tools.addView(label("Nmap وsqlmap غير مدمجين في APK. فحص TCP ليس Nmap. لا يوجد استغلال أو زحف تلقائي.",13,muted))
         button("بدء تقييم جديد",tools,false) { show(2) }
     }
@@ -167,6 +170,50 @@ class MainActivity : Activity() {
             } catch(e:Exception) { toast(e.message ?: "تعذر بدء التقييم") }
         }
     }
+    private fun apkPage() {
+        heading("تحليل تطبيق Android", "اختر APK · تحليل محلي دون تثبيت أو تشغيل")
+        val box=card("ملف APK واحد", "حد الملف 150 MiB. لا يُرسل للشبكة، وتُحذف النسخة المؤقتة بعد الفحص.")
+        val selected=label(if(apkUri==null) "لم يُختر ملف بعد" else "ملف محدد وجاهز للتحليل",15,mint)
+        box.addView(selected)
+        button("اختيار ملف APK",box,false) {
+            startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                addCategory(Intent.CATEGORY_OPENABLE); type="*/*"
+                putExtra(Intent.EXTRA_MIME_TYPES,arrayOf("application/vnd.android.package-archive","application/octet-stream","application/zip"))
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
+            },71)
+        }
+        val reference=input("مرجع ملكيتك أو إذن تحليل الملف",store.get("policy"),box)
+        val authorized=check("أملك الملف أو لدي إذن بمراجعته محليًا",box)
+        box.addView(label("الخطة: SHA-256، Manifest والصلاحيات والمكوّنات المصدرة وشهادات مبلّغ عنها ومراجع API في DEX. لا تشغيل ولا تحليل ديناميكي. مؤشرات API لا تعني وجود ثغرة.",14,muted))
+        val progress=ProgressBar(this).apply { visibility=View.GONE }; box.addView(progress)
+        val status=label("جاهز لاختيار الملف",14,muted); box.addView(status)
+        val results=LinearLayout(this).apply { orientation=LinearLayout.VERTICAL }; body.addView(results)
+        lateinit var run: Button
+        run=button("تحليل APK محليًا",box) {
+            try {
+                val uri=apkUri ?: error("اختر ملف APK أولًا")
+                require(authorized.isChecked && reference.text.isNotBlank()) { "أكد إذنك وأدخل مرجعه" }
+                require(!busy.get()) { "انتظر انتهاء التقييم الجاري" }
+                val project=mapOf("name" to "مراجعة APK محلية", "policy" to reference.text.toString(), "rules" to "تحليل ثابت للملف المختار فقط، دون تشغيله أو الاتصال بخدماته.", "exclusions" to "الشبكة، التنفيذ، التثبيت، واستخراج بيانات المستخدمين")
+                if(busy.compareAndSet(false,true)) {
+                    run.isEnabled=false; progress.visibility=View.VISIBLE; status.text="جارٍ قراءة الأرشيف وManifest وDEX…"
+                    worker.execute {
+                        try {
+                            val findings=ApkReview.analyze(applicationContext,uri)
+                            val report=store.add("APK · تحليل ثابت", "APK اختاره المستخدم؛ الهوية ببصمة SHA-256 داخل الأدلة",findings,project)
+                            runOnUiThread { if(!isDestroyed) {
+                                latest=report; results.removeAllViews()
+                                findings.forEach { f->card(f.title,f.status,results).addView(label(f.evidence,14,muted)) }
+                                button("عرض التقرير وحفظه",results) { reportDialog(report) }
+                                status.text="اكتمل التحليل · ${findings.size} ملاحظة. راجع حدود التغطية."
+                            } }
+                        } catch(e:Exception) { runOnUiThread { if(!isDestroyed) status.text="توقف التحليل: ${e.message ?: "ملف غير مدعوم"}" } }
+                        finally { busy.set(false); runOnUiThread { if(!isDestroyed) { run.isEnabled=true; progress.visibility=View.GONE } } }
+                    }
+                }
+            } catch(e:Exception) { toast(e.message ?: "تعذر البدء") }
+        }
+    }
     private fun historyPage() {
         heading("دفتر الأدلة", "آخر 100 تقييم · محفوظة داخل التطبيق")
         val jobs=store.jobs()
@@ -191,6 +238,13 @@ class MainActivity : Activity() {
     @Deprecated("Platform document picker callback")
     override fun onActivityResult(requestCode: Int,resultCode: Int,data: Intent?) {
         super.onActivityResult(requestCode,resultCode,data)
+        if(requestCode==71 && resultCode==RESULT_OK) {
+            data?.data?.let { uri ->
+                apkUri=uri
+                try { contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) } catch(_:SecurityException) { /* transient access remains usable */ }
+                show(3)
+            }
+        }
         if(requestCode==42 && resultCode==RESULT_OK) try { data?.data?.let { uri->contentResolver.openOutputStream(uri)?.use { it.write(latest.toByteArray()) }; toast("تم حفظ التقرير") } } catch(_:Exception) { toast("تعذر حفظ التقرير") }
     }
     private fun toast(message: String) { Toast.makeText(this,message,Toast.LENGTH_LONG).show() }

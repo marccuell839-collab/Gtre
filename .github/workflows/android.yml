@@ -1,11 +1,11 @@
 name: Android APK
 on:
   push:
-    branches: [main]
+    branches: [android-local-apk]
     paths: ['android/**', '.github/workflows/android.yml']
   workflow_dispatch:
 permissions:
-  contents: write
+  contents: read
 concurrency:
   group: android-${{ github.ref }}
   cancel-in-progress: true
@@ -34,7 +34,7 @@ jobs:
           /tmp/bounty-sql-test
       - name: Build, lint and test
         working-directory: android
-        run: gradle --no-daemon :app:testDebugUnitTest :app:lintDebug :app:assembleDebug
+        run: gradle --no-daemon :app:testDebugUnitTest :app:lintDebug :app:assembleDebug :app:assembleDebugAndroidTest
       - name: Print lint errors on failure
         if: failure()
         run: cat android/app/build/intermediates/lint_intermediate_text_report/debug/lintReportDebug/lint-results-debug.txt || true
@@ -42,6 +42,7 @@ jobs:
         run: |
           mkdir -p dist
           cp android/app/build/outputs/apk/debug/app-debug.apk dist/Bounty-Workbench.apk
+          cp android/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk dist/runtime-tests.apk
           cd dist
           sha256sum Bounty-Workbench.apk > SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
@@ -49,11 +50,6 @@ jobs:
           name: Bounty-Workbench-APK
           path: dist/*
           if-no-files-found: error
-      - name: Publish installable test APK
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          gh release create "android-${GITHUB_RUN_NUMBER}" dist/Bounty-Workbench.apk dist/SHA256SUMS.txt --target "$GITHUB_SHA" --title "Bounty Workbench Android · build ${GITHUB_RUN_NUMBER}" --notes "Installable debug-signed Android APK. Kotlin + C++ JNI, Android 8+. Includes bounded HEAD/TLS/TCP checks and local SQL review. Nmap/sqlmap are not bundled. Debug signing is for personal testing; upgrades across CI builds may need uninstalling the previous build."
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -61,3 +57,38 @@ jobs:
           path: |
             android/app/build/reports/tests/
             android/app/build/reports/lint-results-debug.html
+
+  runtime-smoke:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: Bounty-Workbench-APK
+          path: dist
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 29
+          arch: x86_64
+          profile: pixel_2
+          disable-animations: true
+          script: |
+            adb install dist/Bounty-Workbench.apk
+            adb install dist/runtime-tests.apk
+            adb shell am instrument -w dz.timo.bounty.test/androidx.test.runner.AndroidJUnitRunner | tee instrumentation.txt
+            grep -q 'OK (' instrumentation.txt
+            mkdir -p screenshots
+            adb pull /sdcard/Android/data/dz.timo.bounty/files/ screenshots/
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: android-runtime-evidence
+          path: |
+            instrumentation.txt
+            screenshots/

@@ -5,10 +5,11 @@ android {
     ndkVersion = "27.0.12077973"
     defaultConfig {
         applicationId = "dz.timo.bounty"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.2.0"
+        versionCode = 2
+        versionName = "0.3.0"
         ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64") }
         externalNativeBuild { cmake { cppFlags += "-std=c++17"; arguments += "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON" } }
     }
@@ -17,4 +18,8 @@ android {
     kotlinOptions { jvmTarget = "17" }
     lint { abortOnError = true }
 }
-dependencies { testImplementation("junit:junit:4.13.2") }
+dependencies {
+    testImplementation("junit:junit:4.13.2")
+    androidTestImplementation("androidx.test:runner:1.6.2")
+    androidTestImplementation("androidx.test.ext:junit:1.2.1")
+}
