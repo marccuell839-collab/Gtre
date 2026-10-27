@@ -2,3 +2,9 @@ data/
 __pycache__/
 *.pyc
 .venv/
+android/.gradle/
+android/.cxx/
+android/local.properties
+android/**/build/
+*.jks
+*.keystore

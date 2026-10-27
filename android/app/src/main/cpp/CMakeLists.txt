@@ -1,0 +1,5 @@
+cmake_minimum_required(VERSION 3.22.1)
+project(bounty_native)
+add_library(bounty_native SHARED native.cpp)
+target_compile_features(bounty_native PRIVATE cxx_std_17)
+target_link_options(bounty_native PRIVATE "-Wl,-z,max-page-size=16384")
