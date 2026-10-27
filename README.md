@@ -1,5 +1,9 @@
 # Bounty Workbench
 
+> **تطبيق Android الأصلي:** المشروع في [android/](android/)، مبني بـ Kotlin وC++ مع واجهة عربية زجاجية. نزّل APK بعد نجاح البناء من [Releases](https://github.com/marccuell839-collab/Gtre/releases) أو تابع [GitHub Actions](https://github.com/marccuell839-collab/Gtre/actions/workflows/android.yml). اقرأ [دليل Android](android/README.md) للقدرات والحدود.
+
+> الملفات في جذر المستودع أدناه هي النسخة السابقة للويب المحلي، وليست مطلوبة لتشغيل APK.
+
 نسخة أولى محلية بواجهة عربية لإدارة تقييمات أمنية محدودة ومصرّح بها. ليست منصة استغلال شاملة، ولا تدّعي تعويض المراجعة البشرية أو كشف كل الثغرات.
 
 ## التشغيل
