@@ -1,0 +1,5 @@
+<resources>
+    <item name="mode_http" type="id"/>
+    <item name="mode_tcp" type="id"/>
+    <item name="mode_sql" type="id"/>
+</resources>

@@ -119,18 +119,19 @@ class MainActivity : Activity() {
         val box=card("اختيار المسار")
         val group=RadioGroup(this).apply { orientation=RadioGroup.VERTICAL }
         val options=listOf("HTTP / TLS · طلب HEAD واحد","TCP / C++ · اتصال منفذ واحد","SQL / C++ · كود محلي فقط")
-        options.forEachIndexed { i,s -> group.addView(RadioButton(this).apply { id=100+i; text=s; setTextColor(ink); minHeight=dp(48) }) }
-        group.check(100); box.addView(group)
+        val modeIds=intArrayOf(R.id.mode_http,R.id.mode_tcp,R.id.mode_sql)
+        options.forEachIndexed { i,s -> group.addView(RadioButton(this).apply { id=modeIds[i]; text=s; setTextColor(ink); minHeight=dp(48) }) }
+        group.check(R.id.mode_http); box.addView(group)
         val url=input("الهدف",store.get("url"),box)
         val source=input("نص الكود لمسار SQL فقط · لا تُدخل أسرارًا","",box,true)
         val authorized=check("لدي تصريح واضح لهذا الأصل والأسلوب وراجعت الاستثناءات",box)
         val hostPermission=check("لـ TCP: التصريح يشمل فحص عنوان IP والمنفذ (وليس مسار ويب فقط)",box)
         val plan=label("HTTP: طلب HEAD واحد، دون متابعة التحويلات أو جلب محتوى الصفحة. المهلات وحدود حجم الرؤوس مفعّلة.",13,mint); box.addView(plan)
         group.setOnCheckedChangeListener { _,id ->
-            source.visibility=if(id==102) View.VISIBLE else View.GONE
-            url.isEnabled=id!=102
-            hostPermission.visibility=if(id==101) View.VISIBLE else View.GONE
-            plan.text=when(id) {101->"TCP: اتصال واحد للمنفذ المحدد في الرابط، مهلة 4 ثوانٍ بعد DNS. لا تحميل بيانات أو كشف إصدارات.";102->"SQL: تحليل محلي لأنماط بناء الاستعلام. لا شبكة ولا تنفيذ للكود، والاشتباه ليس إثباتًا.";else->"HTTP: طلب HEAD واحد، دون تحويلات أو جسم الصفحة. DNS والتحقق من TLS وحدود الحجم والمهلات مفعّلة."}
+            source.visibility=if(id==R.id.mode_sql) View.VISIBLE else View.GONE
+            url.isEnabled=id!=R.id.mode_sql
+            hostPermission.visibility=if(id==R.id.mode_tcp) View.VISIBLE else View.GONE
+            plan.text=when(id) {R.id.mode_tcp->"TCP: اتصال واحد للمنفذ المحدد في الرابط، مهلة 4 ثوانٍ بعد DNS. لا تحميل بيانات أو كشف إصدارات.";R.id.mode_sql->"SQL: تحليل محلي لأنماط بناء الاستعلام. لا شبكة ولا تنفيذ للكود، والاشتباه ليس إثباتًا.";else->"HTTP: طلب HEAD واحد، دون تحويلات أو جسم الصفحة. DNS والتحقق من TLS وحدود الحجم والمهلات مفعّلة."}
         }
         source.visibility=View.GONE; hostPermission.visibility=View.GONE
         val progress=ProgressBar(this).apply { visibility=View.GONE }; box.addView(progress)
@@ -142,7 +143,7 @@ class MainActivity : Activity() {
                 require(!busy.get()) { "انتظر انتهاء التقييم الجاري" }
                 require(authorized.isChecked) { "التصريح مطلوب قبل التقييم" }
                 require(store.get("policy").isNotBlank() && store.get("rules").length>=30) { "أعد إعداد البرنامج والنطاق أولًا" }
-                val mode=group.checkedRadioButtonId-100
+                val mode=modeIds.indexOf(group.checkedRadioButtonId)
                 val asset=if(mode==2) null else Scope.check(url.text.toString().trim(),store.get("url"),store.get("exclusions").lines())
                 if(mode==1) { require(hostPermission.isChecked) { "يلزم تصريح IP والمنفذ" }; require(asset!!.path=="/") { "TCP لا يقبل نطاق مسار فرعي" } }
                 val project=listOf("name","policy","rules","exclusions").associateWith { store.get(it) }
